@@ -6,13 +6,22 @@ import {
   getPermissionsAsync,
   requestPermissionsAsync,
 } from 'expo-media-library';
+import { isShortVideo } from './format';
 
 export type VideoItem = {
   id: string;
   name: string;
   duration: number | null;
   creationTime: number | null;
+  width: number | null;
+  height: number | null;
 };
+
+let cache: VideoItem[] = [];
+
+export function getCachedVideos(): VideoItem[] {
+  return cache;
+}
 
 export async function ensureVideoPermission(): Promise<boolean> {
   const current = await getPermissionsAsync(false, ['video']);
@@ -29,12 +38,20 @@ export async function listVideos(): Promise<VideoItem[]> {
     .orderBy({ key: AssetField.CREATION_TIME, ascending: false })
     .exeForMetadata();
 
-  return assets.map((asset) => ({
+  cache = assets.map((asset) => ({
     id: asset.id,
     name: asset.filename ?? 'untitled video',
     duration: asset.duration,
     creationTime: asset.creationTime,
+    width: asset.width,
+    height: asset.height,
   }));
+  return cache;
+}
+
+export async function listShorts(): Promise<VideoItem[]> {
+  const items = cache.length ? cache : await listVideos();
+  return items.filter(isShortVideo);
 }
 
 export function videoUri(id: string): Promise<string> {

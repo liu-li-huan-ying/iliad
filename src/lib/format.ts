@@ -1,5 +1,22 @@
 const FINISHED_RATIO = 0.97;
 
+export const SHORT_MAX_SECONDS = 180;
+export const SHORT_FALLBACK_SECONDS = 60;
+
+export type ShapeHint = {
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+};
+
+export function isShortVideo(item: ShapeHint): boolean {
+  const duration = item.duration ?? 0;
+  if (item.width && item.height) {
+    return item.height > item.width && duration <= SHORT_MAX_SECONDS;
+  }
+  return duration > 0 && duration <= SHORT_FALLBACK_SECONDS;
+}
+
 export function formatClock(totalSeconds: number): string {
   const safe = Number.isFinite(totalSeconds) ? Math.max(0, Math.floor(totalSeconds)) : 0;
   const hours = Math.floor(safe / 3600);

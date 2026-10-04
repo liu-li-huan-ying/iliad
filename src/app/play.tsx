@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -74,12 +74,18 @@ function Playback({ id, title, uri }: { id: string; title: string; uri: string }
   const [thumbs, setThumbs] = useState<VideoThumbnail[]>([]);
   const [notice, setNotice] = useState('');
   const [barWidth, setBarWidth] = useState(0);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [flash, setFlash] = useState<'l' | 'r' | null>(null);
 
+  const holding = useRef(false);
+  const lastTap = useRef({ at: 0, timer: null as ReturnType<typeof setTimeout> | null });
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestRef = useRef({ position: 0, duration: 0 });
   const savedAtRef = useRef(0);
 
   useEffect(() => {
     const saved = readHistory()[id];
+    const tapRef = lastTap;
 
     const onPlaying = player.addListener('playingChange', (event) => {
       setPlaying(event.isPlaying);
@@ -125,6 +131,12 @@ function Playback({ id, title, uri }: { id: string; title: string; uri: string }
       onTime.remove();
       onLoad.remove();
       onStatus.remove();
+      if (hideTimer.current) {
+        clearTimeout(hideTimer.current);
+      }
+      if (tapRef.current.timer) {
+        clearTimeout(tapRef.current.timer);
+      }
       saveProgress(id, latestRef.current.position, latestRef.current.duration);
     };
   }, [player, id]);
@@ -139,15 +151,87 @@ function Playback({ id, title, uri }: { id: string; title: string; uri: string }
     [player]
   );
 
+  const applyRate = (value: number) => {
+    // eslint-disable-next-line react-hooks/immutability
+    player.playbackRate = value;
+  };
+
+  const beginHold = () => {
+    holding.current = true;
+    applyRate(2);
+  };
+
+  const endHold = () => {
+    if (!holding.current) {
+      return;
+    }
+    holding.current = false;
+    applyRate(rate);
+  };
+
   const cycleRate = () => {
     const next = RATES[(RATES.indexOf(rate) + 1) % RATES.length];
     setRate(next);
-    // expo-video exposes playbackRate only as a mutable property, not a method.
-    // eslint-disable-next-line react-hooks/immutability
-    player.playbackRate = next;
+    applyRate(next);
   };
 
   const ratio = ratioOf(time, duration);
+
+  const scheduleAutoHide = (visible: boolean) => {
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+    if (visible && playing) {
+      hideTimer.current = setTimeout(() => setControlsVisible(false), 3500);
+    }
+  };
+
+  const togglePlay = () => {
+    if (playing) {
+      player.pause();
+    } else {
+      player.play();
+    }
+  };
+
+  const handleStagePress = (x: number) => {
+    if (holding.current) {
+      return;
+    }
+    const now = Date.now();
+    const isDouble = now - lastTap.current.at < 300;
+    if (lastTap.current.timer) {
+      clearTimeout(lastTap.current.timer);
+      lastTap.current.timer = null;
+    }
+    lastTap.current.at = isDouble ? 0 : now;
+
+    if (!isDouble) {
+      lastTap.current.timer = setTimeout(() => {
+        lastTap.current.timer = null;
+        setControlsVisible((was) => {
+          scheduleAutoHide(!was);
+          return !was;
+        });
+      }, 300);
+      return;
+    }
+
+    const third = Dimensions.get('window').width / 3;
+    if (x < third) {
+      seekTo(player.currentTime - 10);
+      setFlash('l');
+    } else if (x > third * 2) {
+      seekTo(player.currentTime + 10);
+      setFlash('r');
+    } else {
+      togglePlay();
+    }
+    setTimeout(() => setFlash(null), 400);
+    setControlsVisible(true);
+    scheduleAutoHide(true);
+  };
 
   return (
     <View style={styles.screen}>
@@ -160,21 +244,32 @@ function Playback({ id, title, uri }: { id: string; title: string; uri: string }
         </Text>
       </View>
 
-      <View style={styles.stage}>
+      <Pressable
+        style={styles.stage}
+        onPress={(event) => handleStagePress(event.nativeEvent.locationX)}
+        /* eslint-disable-next-line react-hooks/immutability -- expo-video 的 player 是可变原生对象，倍速只能靠属性写入，没有 setter */
+        onLongPress={beginHold}
+        /* eslint-disable-next-line react-hooks/immutability */
+        onPressOut={endHold}
+      >
         <VideoView player={player} contentFit="contain" style={styles.video} />
-      </View>
+        {flash ? <View pointerEvents="none" style={[styles.flash, flash === 'l' ? styles.flashL : styles.flashR]}>
+          <Text style={styles.flashText}>{flash === 'l' ? '-10' : '+10'}</Text>
+        </View> : null}
+        {!controlsVisible ? <View pointerEvents="none" style={styles.hiddenHint}><Text style={styles.timeText}>tap to show controls</Text></View> : null}
+      </Pressable>
 
+      {controlsVisible ? (
       <View style={styles.controls}>
         <View style={styles.times}>
           <Text style={styles.timeText}>{formatClock(time)}</Text>
           <Text style={styles.timeText}>{duration > 0 ? formatClock(duration) : '--:--'}</Text>
         </View>
 
-        <View
-          style={styles.barTrack}
-          onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}
-        >
-          <View style={[styles.barFill, { width: `${ratio * 100}%` }]} />
+        <View style={styles.barHit} onLayout={(event) => setBarWidth(event.nativeEvent.layout.width)}>
+          <View style={styles.barRail}>
+            <View style={[styles.barFill, { width: `${ratio * 100}%` }]} />
+          </View>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={(event) => {
@@ -187,10 +282,7 @@ function Playback({ id, title, uri }: { id: string; title: string; uri: string }
 
         <View style={styles.buttons}>
           <RoundButton label="-10" onPress={() => seekTo(player.currentTime - 10)} />
-          <RoundButton
-            label={playing ? 'Pause' : 'Play'}
-            onPress={() => (playing ? player.pause() : player.play())}
-          />
+          <RoundButton label={playing ? 'Pause' : 'Play'} onPress={togglePlay} />
           <RoundButton label="+10" onPress={() => seekTo(player.currentTime + 10)} />
           <RoundButton label={`${rate}x`} onPress={cycleRate} />
           <RoundButton
@@ -219,6 +311,7 @@ function Playback({ id, title, uri }: { id: string; title: string; uri: string }
           </ScrollView>
         ) : null}
       </View>
+      ) : null}
     </View>
   );
 }
@@ -253,23 +346,30 @@ const styles = StyleSheet.create({
   controls: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 18, gap: 12 },
   times: { flexDirection: 'row', justifyContent: 'space-between' },
   timeText: { color: '#8b8b93', fontSize: 12, fontVariant: ['tabular-nums'] },
-  barTrack: { height: 4, borderRadius: 2, backgroundColor: '#232328', overflow: 'hidden' },
+  barHit: { height: 48, justifyContent: 'center' },
+  barRail: { height: 4, borderRadius: 2, backgroundColor: '#232328', overflow: 'hidden' },
   barFill: { height: 4, backgroundColor: '#c8a24a' },
+  flash: { position: 'absolute', top: '50%', transform: [{ translateY: -28 }], width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(15,15,17,.6)', alignItems: 'center', justifyContent: 'center' },
+  flashL: { left: 24 },
+  flashR: { right: 24 },
+  flashText: { color: '#c8a24a', fontSize: 13, fontFamily: 'monospace' },
+  hiddenHint: { position: 'absolute', left: 16, bottom: 12 },
   buttons: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   round: {
-    minWidth: 58,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    minWidth: 64,
+    minHeight: 48,
+    paddingHorizontal: 14,
     borderRadius: 8,
     backgroundColor: '#1f1f24',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   roundText: { color: '#e8e8ea', fontSize: 13 },
   notice: { color: '#c8a24a', fontSize: 12 },
   strip: { gap: 8, paddingVertical: 2 },
   thumbBox: { gap: 3 },
   thumb: { width: 84, height: 48, borderRadius: 4, backgroundColor: '#17171b' },
-  thumbTime: { color: '#6d6d76', fontSize: 10 },
+  thumbTime: { color: '#8b8b93', fontSize: 12 },
   noticeScreen: {
     flex: 1,
     backgroundColor: '#0b0b0d',
