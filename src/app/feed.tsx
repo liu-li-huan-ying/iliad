@@ -5,6 +5,7 @@ import { VideoView, useVideoPlayer } from 'expo-video';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { listShorts, videoUri, type VideoItem } from '../lib/media';
 import { formatClock, ratioOf } from '../lib/format';
+import { colors, mono, radius, touch, type as t } from '../lib/theme';
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -191,19 +192,30 @@ function ClipPlayer({ uri }: { uri: string }) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000' },
+  screen: { flex: 1, backgroundColor: colors.bg },
   pager: { flex: 1 },
   page: { flex: 1, backgroundColor: '#000' },
-  topBar: { position: 'absolute', left: 16, right: 16, top: 64, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  counter: { color: 'rgba(232,232,234,.72)', fontSize: 12, fontFamily: 'monospace' },
-  chip: { height: 44, paddingHorizontal: 14, borderRadius: 8, backgroundColor: 'rgba(31,31,36,.85)', justifyContent: 'center' },
-  chipText: { color: '#e8e8ea', fontSize: 13 },
+  topBar: { position: 'absolute', left: 16, right: 16, top: 48, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  counter: { color: colors.text2, fontSize: t.meta, ...mono },
+  chip: { minWidth: touch.min, height: touch.min, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.hairline, justifyContent: 'center', alignItems: 'center' },
+  chipText: { color: colors.text1, fontSize: t.label },
   metaBar: { position: 'absolute', left: 16, right: 88, bottom: 36 },
-  name: { color: '#e8e8ea', fontSize: 14, lineHeight: 20 },
-  detail: { color: '#8b8b93', fontSize: 12, marginTop: 6, fontFamily: 'monospace' },
-  body: { color: '#8b8b93', fontSize: 13 },
-  pauseBadge: { position: 'absolute', left: '50%', top: '50%', transform: [{ translateX: -34 }, { translateY: -34 }] },
-  pauseGlyph: { width: 68, height: 68, borderRadius: 34, borderWidth: 1, borderColor: '#33333b', color: '#c8a24a', fontSize: 22, textAlign: 'center', lineHeight: 68, backgroundColor: 'rgba(15,15,17,.55)' },
+  name: { color: colors.text1, fontSize: t.body, lineHeight: 20 },
+  detail: { color: colors.text2, fontSize: t.meta, marginTop: 6, ...mono },
+  body: { color: colors.text2, fontSize: t.body },
+  pauseBadge: { position: 'absolute', left: '50%', top: '50%', transform: [{ translateX: -31 }, { translateY: -31 }] },
+  pauseGlyph: {
+    width: 62,
+    height: 62,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.11)',
+    color: colors.accent,
+    fontSize: 20,
+    textAlign: 'center',
+    lineHeight: 62,
+    backgroundColor: 'rgba(7,9,13,.78)',
+  },
   line: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 2, backgroundColor: 'rgba(255,255,255,.16)' },
-  lineFill: { height: 2, backgroundColor: '#c8a24a' },
+  lineFill: { height: 2, backgroundColor: colors.accent },
 });
