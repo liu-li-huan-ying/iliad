@@ -8,7 +8,7 @@ import { formatClock, ratioOf } from '../lib/format';
 
 export default function FeedScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ index?: string }>();
+  const params = useLocalSearchParams<{ id?: string }>();
   const [items, setItems] = useState<VideoItem[]>([]);
   const [current, setCurrent] = useState(0);
 
@@ -20,14 +20,14 @@ export default function FeedScreen() {
         return;
       }
       setItems(shorts);
-      const asked = Number(params.index ?? 0);
-      setCurrent(Number.isFinite(asked) ? Math.min(Math.max(0, asked), Math.max(0, shorts.length - 1)) : 0);
+      const wanted = shorts.findIndex((clip) => clip.id === params.id);
+      setCurrent(wanted >= 0 ? wanted : 0);
     };
     void load();
     return () => {
       alive = false;
     };
-  }, [params.index]);
+  }, [params.id]);
 
   if (items.length === 0) {
     return (
