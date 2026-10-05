@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ensureVideoPermission, getCachedVideos, listVideos } from '../lib/media';
+import { ensureVideoPermission, getCachedVideos, listVideos, mediaBackend, mediaFailure } from '../lib/media';
 import { readHistory } from '../lib/history';
 import { isShortVideo, ratioOf } from '../lib/format';
 import { pickExternalRoot, SOURCES } from '../lib/sources';
@@ -16,18 +16,22 @@ export default function HomeScreen() {
   const [tab, setTab] = useState<'internal' | 'external' | 'cloud' | 'lan'>('internal');
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'denied'>('idle');
   const [externalName, setExternalName] = useState<string | null>(null);
+  const [reason, setReason] = useState('');
 
   const scan = async () => {
     setPhase('loading');
     if (!(await ensureVideoPermission())) {
+      const noModule = mediaBackend() === 'none';
+      setReason(noModule ? mediaFailure() : '没有视频读取权限就没有内容可放');
       setPhase('denied');
-      showToast('警告', '没有视频读取权限就没有内容可放');
+      showToast('警告', noModule ? '这个客户端没有媒体库原生模块' : '没有视频读取权限');
       return;
     }
     try {
       await listVideos();
       setPhase('ready');
     } catch (error) {
+      setReason(error instanceof Error ? error.message : '媒体库读取失败');
       setPhase('denied');
       showToast('警告', error instanceof Error ? error.message : '媒体库读取失败');
     }
@@ -128,9 +132,12 @@ export default function HomeScreen() {
         ))}
 
         {phase === 'denied' ? (
-          <Pressable onPress={() => void scan()} style={styles.retry}>
-            <Text style={styles.retryText}>重新扫描本地视频</Text>
-          </Pressable>
+          <View style={styles.deniedBox}>
+            <Text style={styles.deniedText}>{reason}</Text>
+            <Pressable onPress={() => void scan()} style={styles.retry}>
+              <Text style={styles.retryText}>重新扫描本地视频</Text>
+            </Pressable>
+          </View>
         ) : null}
 
         {resume.length > 0 ? (
@@ -201,6 +208,8 @@ const styles = StyleSheet.create({
   cardMeta: { color: colors.text2, fontSize: t.meta, lineHeight: 18 },
   bar: { height: 3, borderRadius: 2, backgroundColor: colors.hover, overflow: 'hidden' },
   barFill: { height: 3, borderRadius: 2, backgroundColor: colors.accent },
+  deniedBox: { gap: 10, marginTop: 6 },
+  deniedText: { color: colors.text2, fontSize: t.meta, lineHeight: 19 },
   retry: { alignSelf: 'flex-start', minHeight: touch.min, paddingHorizontal: 16, justifyContent: 'center', borderRadius: radius.sm, borderWidth: 1, borderColor: colors.accentBorder, marginTop: 6 },
   retryText: { color: colors.accent, fontSize: t.label },
   section: { color: colors.text3, fontSize: t.meta, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: '600', marginTop: 22, marginBottom: 10 },

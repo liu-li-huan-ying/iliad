@@ -43,14 +43,22 @@ function loadApi(): boolean {
     return true;
   }
   try {
-    next = require('expo-media-library') as NextModule;
-    return true;
+    const mod = require('expo-media-library');
+    if (mod?.Query && mod?.AssetField && mod?.requestPermissionsAsync) {
+      next = mod as NextModule;
+      return true;
+    }
+    missing = 'expo-media-library 已加载但没有 Query API';
   } catch (error) {
     missing = `expo-media-library: ${error instanceof Error ? error.message : String(error)}`;
   }
   try {
-    legacy = require('expo-media-library/legacy') as LegacyModule;
-    return true;
+    const mod = require('expo-media-library/legacy');
+    if (mod?.getAssetsAsync && mod?.requestPermissionsAsync) {
+      legacy = mod as LegacyModule;
+      return true;
+    }
+    missing += ' | legacy: 模块没有 getAssetsAsync';
   } catch (error) {
     missing += ` | legacy: ${error instanceof Error ? error.message : String(error)}`;
   }
