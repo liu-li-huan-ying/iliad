@@ -53,11 +53,19 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - name: Assemble debug APK
+      - name: Assemble APKs
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace
 
-      - uses: actions/upload-artifact@v7
+      - name: Upload standalone release APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: iliad-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload dev-client debug APK
+        uses: actions/upload-artifact@v7
         with:
           name: iliad-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
