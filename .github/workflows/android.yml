@@ -53,9 +53,18 @@ jobs:
           java-version: 21
           cache: gradle
 
-      - name: Assemble APKs
+      - name: Raise Gradle heap
+        # The template default is too small: packaging a 244MB debug APK hit
+        # OutOfMemoryError in :app:packageDebug.
+        run: printf '\norg.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g\n' >> android/gradle.properties
+
+      - name: Assemble release APK
         working-directory: android
-        run: ./gradlew assembleRelease assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload standalone release APK
         uses: actions/upload-artifact@v7
